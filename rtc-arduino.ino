@@ -1,6 +1,8 @@
 #include <DHT.h>
 #include "TFT_22_ILI9225.h"
 #include <SoftwareSerial.h>
+#include <SoftwareWire.h>
+#include <RtcDS3231.h>
 
 #define DHTPIN 13
 #define DHTTYPE DHT11
@@ -26,7 +28,23 @@ int vccBluetooth = 8;
 int gndBluetooth = 9;
 String receivedData = "C";
 
+SoftwareWire rtcWire(5, 4);
+RtcDS3231<SoftwareWire> rtc(rtcWire);
+int gndRtc = 7;
+int vccRtc = 6;
+
 void setup() {
+  pinMode(vccRtc, OUTPUT);
+  pinMode(gndRtc, OUTPUT);
+  digitalWrite(vccRtc, HIGH);
+  digitalWrite(gndRtc, LOW);
+  rtcWire.begin();
+  rtc.Begin();
+  if (!rtc.GetIsRunning()) {
+    Serial.println("Запуск часов RTC");
+    rtc.SetIsRunning(true);
+  }
+
   pinMode(vccBluetooth, OUTPUT);
   pinMode(gndBluetooth, OUTPUT);
   digitalWrite(vccBluetooth, HIGH);
@@ -57,7 +75,15 @@ void setup() {
 }
 
 void loop() {
-  tft.drawText(clockX, clockY, "10 : 10 : 15", COLOR_WHITE);
+  RtcDateTime now = rtc.GetDateTime();
+  char timeString[13];
+  char dateString[10];
+  sprintf(dateString, "%02d-%02d-%04d", now.Day(), now.Month(), now.Year());
+  sprintf(timeString, "%02d : %02d : %02d", now.Hour(), now.Minute(), now.Second());
+  
+          
+  tft.drawText(clockX, clockY - 20, dateString, COLOR_WHITE);
+  tft.drawText(clockX, clockY, timeString, COLOR_WHITE);
 
   float humidity = dht.readHumidity();
   float temperature = dht.readTemperature();
