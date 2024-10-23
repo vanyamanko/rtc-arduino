@@ -3,6 +3,7 @@
 #include <SoftwareSerial.h>
 #include <SoftwareWire.h>
 #include <RtcDS3231.h>
+#include "validator.h"
 
 #define DHTPIN 13
 #define DHTTYPE DHT11
@@ -26,12 +27,15 @@ int clockY;
 SoftwareSerial bluetoothSerial(10, 11);
 int vccBluetooth = 8;
 int gndBluetooth = 9;
-String receivedData = "C";
+String receivedData = "";
 
 SoftwareWire rtcWire(5, 4);
 RtcDS3231<SoftwareWire> rtc(rtcWire);
 int gndRtc = 7;
 int vccRtc = 6;
+
+bool flagF = false;
+bool flagC = true;
 
 void setup() {
   pinMode(vccRtc, OUTPUT);
@@ -97,12 +101,62 @@ void loop() {
       receivedData += dataByte;
     }
   }
-  if(receivedData == "F") {
+  Serial.println(receivedData);
+  if((receivedData == "F" || flagF) && receivedData != "C") {
     float temperatureF = (temperature * 9.0 / 5.0) + 32.0;
     tft.drawText(150, 50, String(temperatureF, 1), COLOR_WHITE);
     tft.drawText(200, 50, "F", COLOR_WHITE);
-  } else {
+    flagF = true;
+    flagC = false;
+    if(receivedData.length() == 1) {
+      receivedData = "";
+    }
+  } 
+  if((receivedData == "C" || flagC) && receivedData != "F") {
     tft.drawText(150, 50, String(temperature, 1), COLOR_WHITE);
     tft.drawText(200, 50, "C", COLOR_WHITE);
+    flagC = true;
+    flagF = false;
+    if(receivedData.length() == 1) {
+      receivedData = "";
+    }
   }
+  if(checkValidTimeString(receivedData)) {
+    int hours = receivedData.substring(0, 2).toInt();
+    int minutes = receivedData.substring(3, 5).toInt();
+    int seconds = receivedData.substring(6, 8).toInt();
+
+    RtcDateTime currentDate = rtc.GetDateTime();
+    RtcDateTime newDateTime(
+        currentDate.Year(),
+        currentDate.Month(),
+        currentDate.Day(),
+        hours,
+        minutes,
+        seconds
+    );
+
+    rtc.SetDateTime(newDateTime);
+    receivedData = "";
+  }
+  if(checkValidDateString(receivedData)) {
+    int day = receivedData.substring(0, 2).toInt();
+    int month = receivedData.substring(3, 5).toInt();
+    int year = receivedData.substring(6, 10).toInt();
+
+    RtcDateTime currentTime = rtc.GetDateTime();
+    RtcDateTime newDateTime(
+        year,
+        month,
+        day,
+        currentTime.Hour(),
+        currentTime.Minute(),
+        currentTime.Second()
+    );
+
+    rtc.SetDateTime(newDateTime);
+    receivedData = "";
+  }
+
+  receivedData = "";
 }
